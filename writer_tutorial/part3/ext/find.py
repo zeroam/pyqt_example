@@ -33,11 +33,9 @@ class Find(QtWidgets.QDialog):
 
         # Normal mode - radio button
         self.normalRadio = QtWidgets.QRadioButton('Normal', self)
-        self.normalRadio.toggled.connect(self.normalMode)
 
         # Regular Expression Mode - radio button
         self.regexRadio = QtWidgets.QRadioButton('RegEx', self)
-        self.regexRadio.toggled.connect(self.regexMode)
 
         # The field into which to type the query
         self.findField = QtWidgets.QTextEdit(self)
@@ -47,14 +45,6 @@ class Find(QtWidgets.QDialog):
         # queried text
         self.replaceField = QtWidgets.QTextEdit(self)
         self.replaceField.resize(250, 50)
-
-        optionsLabel = QtWidgets.QLabel('Options: ', self)
-
-        # Case Sensitivity option
-        self.caseSens = QtWidgets.QCheckBox('Case sensitive', self)
-
-        # Whole Words option
-        self.wholeWords = QtWidgets.QCheckBox('Whole words', self)
 
         # Layout the objects on the screen
         layout = QtWidgets.QGridLayout()
@@ -69,17 +59,6 @@ class Find(QtWidgets.QDialog):
         layout.addWidget(replaceButton, 4, 0, 1, 2)
         layout.addWidget(allButton, 4, 2, 1, 2)
 
-        # Add some spacing
-        spacer = QtWidgets.QWidget(self)
-
-        spacer.setFixedSize(0, 10)
-
-        layout.addWidget(spacer, 5, 0)
-
-        layout.addWidget(optionsLabel, 6, 0)
-        layout.addWidget(self.caseSens, 6, 1)
-        layout.addWidget(self.wholeWords, 6, 2)
-
         self.setGeometry(300, 300, 360, 250)
         self.setWindowTitle('Find and Replace')
         self.setLayout(layout)
@@ -88,16 +67,76 @@ class Find(QtWidgets.QDialog):
         self.normalRadio.setChecked(True)
 
     def find(self):
-        pass
+        # Grab the parent's text
+        text = self.parent.text.toPlainText()
+
+        # And the text to find
+        query = self.findField.toPlainText()
+
+        if self.normalRadio.isChecked():
+
+            # Use normal string search to find the query from the
+            # last starting position
+            self.lastStart = text.find(query, self.lastStart + 1)
+
+            # If the find() method didn't return -1 (not found)
+            if self.lastStart >= 0:
+                end = self.lastStart + len(query)
+                self.moveCursor(self.lastStart, end)
+            else:
+                # Make the next search start from the begining again
+                self.lastStart = 0
+                self.parent.text.moveCursor(QtGui.QTextCursor.End)
+        else:
+
+            # Compile the pattern
+            pattern = re.compile(query)
+
+            # The actual search
+            match = pattern.search(text, self.lastStart + 1)
+
+            if match:
+                self.lastStart = match.start()
+
+                self.moveCursor(self.lastStart, match.end())
+            else:
+                self.lastStart = 0
+
+                # We set the cursor to the end if the search was unsuccessful
+                self.parent.text.moveCursor(QtGui.QTextCursor.End)
 
     def replace(self):
-        pass
+        # Grab the text cursor
+        cursor = self.parent.text.textCursor()
+
+        # Security
+        if cursor.hasSelection():
+            # We insert the new text, which will override the selected text
+            cursor.insertText(self.replaceField.toPlainText())
+
+            # And set the new
+            self.parent.text.setTextCursor(cursor)
 
     def replaceAll(self):
-        pass
+        self.lastStart = 0
 
-    def normalMode(self):
-        pass
+        self.find()
 
-    def regexMode(self):
-        pass
+        # Replace and find until self.lastStart is 0 again
+        while self.lastStart:
+            self.replace()
+            self.find()
+
+    def moveCursor(self, start, end):
+        # We retrieve the QTextCursor object from the parent's QTextEdit
+        cursor = self.parent.text.textCursor()
+
+        # Then we et the position to the beginning of the last match
+        cursor.setPosition(start)
+
+        # Next we move the Cursor by over the match and pass the KeepAnchor parameter
+        # which will make the cursor select the match's text
+        cursor.movePosition(QtGui.QTextCursor.Right, QtGui.QTextCursor.KeepAnchor, end - start)
+
+        # And finally we set this new cursor as the parent's
+        self.parent.text.setTextCursor(cursor)

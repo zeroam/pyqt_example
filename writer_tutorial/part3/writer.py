@@ -4,7 +4,7 @@ from PyQt5 import QtPrintSupport
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtCore import Qt
 
-from ext import find
+from ext import find, wordcount
 
 
 class Main(QtWidgets.QMainWindow):
@@ -73,6 +73,16 @@ class Main(QtWidgets.QMainWindow):
         self.redoAction.setShortcut('Ctrl+Y')
         self.redoAction.triggered.connect(self.text.redo)
 
+        wordCountAction = QtWidgets.QAction(QtGui.QIcon('icons/count.png'), 'See word/symbol count', self)
+        wordCountAction.setStatusTip('See word/symbol count')
+        wordCountAction.setShortcut('Ctrl+W')
+        wordCountAction.triggered.connect(self.wordCount)
+
+        imageAction = QtWidgets.QAction(QtGui.QIcon('icons/image.png'), 'Insert image', self)
+        imageAction.setStatusTip('Insert image')
+        imageAction.setShortcut('Ctrl+Shift+I')
+        imageAction.triggered.connect(self.insertImage)
+
         bulletAction = QtWidgets.QAction(QtGui.QIcon('icons/bullet.png'), 'Insert bullet List', self)
         bulletAction.setStatusTip('Insert bullet list')
         bulletAction.setShortcut('Ctrl+Shift+B')
@@ -105,6 +115,8 @@ class Main(QtWidgets.QMainWindow):
         self.toolbar.addSeparator()
 
         self.toolbar.addAction(self.findAction)
+        self.toolbar.addAction(wordCountAction)
+        self.toolbar.addAction(imageAction)
 
         self.toolbar.addSeparator()
 
@@ -261,11 +273,13 @@ class Main(QtWidgets.QMainWindow):
         # Initialize a statusbar for the window
         self.statusbar = self.statusBar()
 
+        # If the cursor position changes, call the function that displays
+        # the line and column number
+        self.text.cursorPositionChanged.connect(self.cursorPosition)
+
         # x and y coordinates on the screen, width, height
         self.setGeometry(100, 100, 1030, 800)
-
         self.setWindowTitle('Writer')
-
         self.setWindowIcon(QtGui.QIcon('icons/icon.png'))
 
     def new(self):
@@ -332,6 +346,40 @@ class Main(QtWidgets.QMainWindow):
 
     def fontSize(self, fontsize):
         self.text.setFontPointSize(int(fontsize))
+
+    def cursorPosition(self):
+        cursor = self.text.textCursor()
+
+        # Mortals like 1-indexed things
+        line = cursor.blockNumber() + 1
+        col = cursor.columnNumber()
+
+        self.statusbar.showMessage(f'Line: {line} | Column: {col}')
+
+    def wordCount(self):
+        wc = wordcount.WordCount(self)
+        wc.getText()
+        wc.show()
+
+    def insertImage(self):
+        # Get image file name
+        filename = QtWidgets.QFileDialog.getOpenFileName(self, 'Insert image', '.', 'Images (*.png *.xpm *.jpg *.bmp *.gif)')[0]
+
+        if filename:
+            # Create image object
+            image = QtGui.QImage(filename)
+
+            # Error if unloadable
+            if image.isNull():
+                popup = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Critical,
+                                              'Image load error',
+                                              'Could not load image file!',
+                                              QtWidgets.QMessageBox.Ok,
+                                              self)
+                popup.show()
+            else:
+                cursor = self.text.textCursor()
+                cursor.insertImage(image, filename)
 
     def fontColor(self):
         # Get a color from the text dialog
